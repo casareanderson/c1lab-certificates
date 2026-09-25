@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C1 Lab Certificates</title>
+<meta name="robots" content="noindex">
+<style>
+:root{color-scheme:dark;--bg:#0e0e0e;--card:#171717;--ink:#f3f1ec;--dim:#a39e94;--line:#2c2c2c;--silver:#d7dbe0;--ok:#7fd49a;--bad:#f08a7a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;padding:32px 16px 64px}
+.wrap{max-width:620px;margin:0 auto;display:grid;gap:22px}
+header{display:flex;align-items:center;gap:14px}
+header svg{width:56px;height:56px;flex:none}
+h1{margin:0;font-size:clamp(26px,6vw,34px);letter-spacing:.5px;line-height:1.1}
+h2{margin:0 0 4px;font-size:19px}
+p{margin:0;color:var(--dim)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:12px}
+label{font-size:13px;color:var(--dim);display:grid;gap:6px}
+input{font:inherit;color:var(--ink);background:#0b0b0b;border:1px solid var(--line);border-radius:8px;padding:11px 12px;width:100%}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--silver);outline-offset:2px}
+button{font:inherit;font-weight:700;background:var(--silver);color:#0e0e0e;border:0;border-radius:999px;padding:11px 20px;cursor:pointer;justify-self:start}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:480px){.row{grid-template-columns:1fr}}
+.out{min-height:1.5em}
+.ok{color:var(--ok)} .bad{color:var(--bad)}
+.out img{width:100%;border-radius:8px;border:1px solid var(--line);margin-top:10px}
+.out a{color:var(--silver);font-weight:700}
+footer{font-size:13px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <svg viewBox="0 0 100 100" aria-hidden="true"><defs><mask id="m"><rect width="100" height="100" fill="#fff"/><circle cx="64" cy="42" r="36" fill="#000"/></mask></defs><circle cx="50" cy="50" r="40" fill="#d7dbe0" mask="url(#m)"/></svg>
+    <h1>C1 Lab certificates</h1>
+  </header>
+  <p>Every C1 Lab limited edition has a numbered certificate of authenticity. Get yours again here, or check that a certificate code is genuine.</p>
+
+  <form class="card" id="claim">
+    <h2>Get your certificate</h2>
+    <p>Use the order number from your Etsy receipt and the first name on the order.</p>
+    <div class="row">
+      <label for="order">Etsy order number<input id="order" inputmode="numeric" autocomplete="off" required placeholder="e.g. 3456789012"></label>
+      <label for="first">First name<input id="first" autocomplete="given-name" required placeholder="e.g. Sam"></label>
+    </div>
+    <button type="submit">Find my certificate</button>
+    <div class="out" id="claimOut" aria-live="polite"></div>
+  </form>
+
+  <form class="card" id="verify">
+    <h2>Check a certificate</h2>
+    <p>Type the code printed on the certificate, like ABCDE-12345.</p>
+    <label for="code">Certificate code<input id="code" autocomplete="off" required placeholder="XXXXX-XXXXX"></label>
+    <button type="submit">Check it</button>
+    <div class="out" id="verifyOut" aria-live="polite"></div>
+  </form>
+
+  <footer>No personal details are stored on this page. Certificates are filed under a scrambled key made from the order number and first name, and codes are only stored scrambled. Shop: THEC1LAB on Etsy.</footer>
+</div>
+<script>
+async function sha256(s){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+const $=id=>document.getElementById(id);
+$("claim").addEventListener("submit",async e=>{
+  e.preventDefault();const out=$("claimOut");out.className="out";out.textContent="Looking…";
+  const order=$("order").value.replace(/\D/g,""),first=$("first").value.trim().split(/\s+/)[0].toLowerCase();
+  if(!order||!first){out.className="out bad";out.textContent="Please fill in both boxes.";return}
+  const h=await sha256(order+"|"+first);
+  try{
+    const r=await fetch(`certs/${h}.pdf`,{method:"HEAD",cache:"no-store"});
+    if(!r.ok)throw 0;
+    out.className="out ok";
+    out.innerHTML=`Found it. <a href="certs/${h}.pdf" target="_blank" rel="noopener">Open your certificate (PDF)</a><img src="certs/${h}.png" alt="Your C1 Lab certificate">`;
+  }catch(_){out.className="out bad";out.textContent="No certificate found for that order number and first name. New orders can take up to 30 minutes to appear. Check both boxes, or message the shop on Etsy."}
+});
+$("verify").addEventListener("submit",async e=>{
+  e.preventDefault();const out=$("verifyOut");out.className="out";out.textContent="Checking…";
+  const code=$("code").value.toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if(code.length!==10){out.className="out bad";out.textContent="A certificate code has 10 letters and numbers, like ABCDE-12345.";return}
+  const h=await sha256(code.slice(0,5)+"-"+code.slice(5));
+  try{
+    const list=await (await fetch("codes.json",{cache:"no-store"})).json();
+    const hit=list[h];
+    if(hit){out.className="out ok";out.textContent=`Genuine C1 Lab print: ${hit.design}, No. ${hit.number}.`}
+    else{out.className="out bad";out.textContent="That code isn't one of ours. It may be mistyped, or the print may not be genuine."}
+  }catch(_){out.className="out bad";out.textContent="Couldn't check right now. Please try again in a minute."}
+});
+</script>
+</body>
+</html>
